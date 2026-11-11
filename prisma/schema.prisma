@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum VerificationMethod {
+  AI_FACIAL
+  MANUAL_ROSTER
+  TEACHER_OVERRIDE
+  PRINCIPAL_CORRECTION
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+}
+
+enum SyncOpStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+  CONFLICT
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  district  String
+  state     String
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  classes            Class[]
+  students           Student[]
+  teachers           Teacher[]
+  settings           SchoolSettings?
+  timetableEntries   TimetableEntry[]
+  attendanceSessions AttendanceSession[]
+  timetableCoverages TimetableCoverage[]
+}
+
+model SchoolSettings {
+  id                         String   @id @default(cuid())
+  schoolId                   String   @unique
+  school                     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear               String   @default("2026-2027")
+  attendanceCutoffTime       String   @default("10:30")
+  allowOfflineAttendance     Boolean  @default(true)
+  requireTeacherConfirmation Boolean  @default(true)
+  aiConfidenceThreshold      Float    @default(0.65)
+  offlineRetentionDays       Int      @default(30)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(TEACHER)
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacherProfile             Teacher?
+  devices                    Device[]
+  correctionLogs             AttendanceCorrectionLog[]
+  syncOperations             SyncOperation[]
+  markedAttendanceSessions   AttendanceSession[]       @relation("AttendanceSessionMarker")
+  assignedTimetableCoverages TimetableCoverage[]       @relation("TimetableCoverageAssigner")
+}
+
+model Teacher {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employeeId     String
+  phone          String?
+  specialization String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignedClasses    Class[]             @relation("TeacherClasses")
+  primarySections    Section[]           @relation("ClassTeacher")
+  timetableEntries   TimetableEntry[]
+  timetableCoverages TimetableCoverage[]
+}
+
+model Class {
+  id         String   @id @default(cuid())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name       String
+  gradeLevel Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sections         Section[]
+  teachers         Teacher[]        @relation("TeacherClasses")
+  students         Student[]
+  timetableEntries TimetableEntry[]
+}
+
+model Section {
+  id             String   @id @default(cuid())
+  name           String
+  classId        String
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classTeacherId String?
+  classTeacher   Teacher? @relation("ClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  enrollments        Enrollment[]
+  attendances        Attendance[]
+  timetableEntries   TimetableEntry[]
+  attendanceSessions AttendanceSession[]
+}
+
+model TimetableCoverage {
+  id               String         @id @default(cuid())
+  schoolId         String
+  school           School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  timetableEntryId String
+  timetableEntry   TimetableEntry @relation(fields: [timetableEntryId], references: [id], onDelete: Cascade)
+  date             DateTime
+  teacherId        String
+  teacher          Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  assignedByUserId String
+  assignedBy       User           @relation("TimetableCoverageAssigner", fields: [assignedByUserId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([timetableEntryId, date])
+  @@index([schoolId, date])
+  @@index([teacherId, date])
+}
+
+model TimetableEntry {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject   String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendanceSessions AttendanceSession[]
+  coverages          TimetableCoverage[]
+
+  @@index([schoolId, dayOfWeek, startTime])
+  @@index([teacherId, dayOfWeek])
+  @@index([sectionId, dayOfWeek])
+}
+
+model Student {
+  id            String        @id @default(cuid())
+  studentId     String        @unique
+  name          String
+  rollNumber    String
+  schoolId      String
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId       String
+  class         Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  gender        String        @default("Not Specified")
+  dob           DateTime?
+  guardianName  String?
+  guardianPhone String?
+  address       String?
+  photoUrl      String?
+  status        StudentStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  enrollments         Enrollment[]
+  biometricReferences BiometricReference[]
+  attendances         Attendance[]
+}
+
+model Enrollment {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sectionId    String
+  section      Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  academicYear String
+  rollNumber   String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([studentId, academicYear])
+}
+
+model BiometricReference {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  descriptor     String   @db.Text
+  photoThumbnail String?  @db.Text
+  qualityScore   Float    @default(1.0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Attendance {
+  id                 String             @id @default(cuid())
+  studentId          String
+  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sectionId          String
+  section            Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sessionId          String
+  session            AttendanceSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  date               DateTime
+  status             AttendanceStatus   @default(PRESENT)
+  verifiedByAi       Boolean            @default(false)
+  aiConfidence       Float?
+  verificationMethod VerificationMethod @default(MANUAL_ROSTER)
+  markedByUserId     String?
+  deviceId           String?
+  device             Device?            @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+  syncStatus         SyncStatus         @default(SYNCED)
+  offlineCreated     Boolean            @default(false)
+  clientRecordedAt   DateTime           @default(now())
+  remarks            String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  corrections AttendanceCorrectionLog[]
+
+  @@unique([sessionId, studentId])
+  @@index([sectionId, date])
+}
+
+model AttendanceSession {
+  id                       String          @id @default(cuid())
+  sessionKey               String          @unique
+  schoolId                 String
+  school                   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sectionId                String
+  section                  Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  timetableEntryId         String?
+  timetableEntry           TimetableEntry? @relation(fields: [timetableEntryId], references: [id], onDelete: SetNull)
+  isLegacy                 Boolean         @default(false)
+  date                     DateTime
+  timetableEntryIdSnapshot String?
+  subjectSnapshot          String?
+  teacherIdSnapshot        String?
+  teacherNameSnapshot      String?
+  classNameSnapshot        String?
+  sectionNameSnapshot      String?
+  dayOfWeekSnapshot        Int?
+  startTimeSnapshot        String?
+  endTimeSnapshot          String?
+  markedByUserId           String?
+  markedByUser             User?           @relation("AttendanceSessionMarker", fields: [markedByUserId], references: [id], onDelete: SetNull)
+  markedAt                 DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  records Attendance[]
+
+  @@unique([timetableEntryId, date])
+  @@index([schoolId, date])
+  @@index([sectionId, date])
+}
+
+model AttendanceCorrectionLog {
+  id                String           @id @default(cuid())
+  attendanceId      String
+  attendance        Attendance       @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  previousStatus    AttendanceStatus
+  newStatus         AttendanceStatus
+  reason            String
+  correctedByUserId String
+  correctedByUser   User             @relation(fields: [correctedByUserId], references: [id], onDelete: Cascade)
+  correctedAt       DateTime         @default(now())
+}
+
+model Device {
+  id          String    @id @default(cuid())
+  deviceId    String    @unique
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deviceName  String
+  browserInfo String?
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attendances    Attendance[]
+  syncOperations SyncOperation[]
+}
+
+model SyncOperation {
+  id              String       @id @default(cuid())
+  operationId     String       @unique
+  deviceId        String
+  device          Device       @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityType      String       @default("ATTENDANCE_BATCH")
+  batchSize       Int          @default(0)
+  status          SyncOpStatus @default(SUCCESS)
+  conflictDetails String?      @db.Text
+  errorMessage    String?      @db.Text
+  syncedAt        DateTime     @default(now())
+}
