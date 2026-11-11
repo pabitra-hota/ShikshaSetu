@@ -1,16 +1,21 @@
 {
   "version": 2,
-  "framework": null,
-  "installCommand": "npm install",
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/index.js": {
-      "memory": 512,
-      "maxDuration": 15,
-      "includeFiles": "data/seed.db,prisma/schema.prisma,server/**"
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["data/seed.db", "prisma/schema.prisma", "server/**"]
+      }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
-  },
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
