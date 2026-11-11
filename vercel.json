@@ -7,13 +7,12 @@
       "config": {
         "maxDuration": 60,
         "includeFiles": [
-          "prisma/schema.prisma",
-          "prisma/seed.js",
-          "prisma/seed-school-routine.js",
+          "prisma/**",
           "server/**",
           "node_modules/.prisma/**",
           "node_modules/@prisma/**",
-          "node_modules/prisma/**"
+          "node_modules/prisma/**",
+          "node_modules/.bin/prisma"
         ]
       }
     },

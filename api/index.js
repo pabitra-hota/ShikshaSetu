@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
 const tmpDb = "/tmp/prod.db";
 
 // Set DATABASE_URL FIRST — before anything else loads
@@ -13,16 +14,21 @@ process.env.DATABASE_URL = `file:${tmpDb}`;
 if (!existsSync(tmpDb)) {
   console.log("🗄️ Cold start — initializing SQLite database in /tmp...");
   try {
-    const schemaPath = join(__dirname, "..", "prisma", "schema.prisma");
-    execSync(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss`, {
+    // Use the prisma binary from node_modules directly (npx not available on Vercel runtime)
+    const prismaBin = join(root, "node_modules", ".bin", "prisma");
+    const schemaPath = join(root, "prisma", "schema.prisma");
+
+    execSync(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss`, {
       stdio: "pipe",
+      cwd: root,
       env: { ...process.env, DATABASE_URL: `file:${tmpDb}` },
     });
     console.log("✅ Schema pushed to /tmp/prod.db");
 
-    const seedPath = join(__dirname, "..", "prisma", "seed.js");
+    const seedPath = join(root, "prisma", "seed.js");
     execSync(`node "${seedPath}"`, {
       stdio: "pipe",
+      cwd: root,
       env: { ...process.env, DATABASE_URL: `file:${tmpDb}` },
     });
     console.log("✅ Database seeded");
