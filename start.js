@@ -38,3 +38,4 @@ if (!existsSync(dbPath)) {
 // Now start the actual server
 console.log("🚀 Starting ShikshaSetu server...");
 import("./server/index.js");
+
