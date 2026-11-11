@@ -30,6 +30,7 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 *.log
+/data/
 .vite
 
 # typescript / prisma
