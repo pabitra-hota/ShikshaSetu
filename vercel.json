@@ -1,14 +1,20 @@
 {
   "version": 2,
-  "projectSettings": {
-    "framework": null
-  },
   "builds": [
     {
       "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["data/seed.db", "prisma/schema.prisma", "server/**"]
+        "maxDuration": 60,
+        "includeFiles": [
+          "prisma/schema.prisma",
+          "prisma/seed.js",
+          "prisma/seed-school-routine.js",
+          "server/**",
+          "node_modules/.prisma/**",
+          "node_modules/@prisma/**",
+          "node_modules/prisma/**"
+        ]
       }
     },
     {
