@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: shikshasetu
+    runtime: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npx prisma db push && npm run db:seed && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        value: file:./prisma/prod.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_NAME
+        value: "ShikshaSetu - AI Rural School Attendance PWA"
+      - key: NEXT_PUBLIC_APP_VERSION
+        value: "1.0.0"

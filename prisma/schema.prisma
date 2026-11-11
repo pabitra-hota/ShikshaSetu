@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -236,8 +236,8 @@ model BiometricReference {
   id             String   @id @default(cuid())
   studentId      String
   student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  descriptor     String   @db.Text
-  photoThumbnail String?  @db.Text
+  descriptor     String
+  photoThumbnail String?
   qualityScore   Float    @default(1.0)
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -343,7 +343,7 @@ model SyncOperation {
   entityType      String       @default("ATTENDANCE_BATCH")
   batchSize       Int          @default(0)
   status          SyncOpStatus @default(SUCCESS)
-  conflictDetails String?      @db.Text
-  errorMessage    String?      @db.Text
+  conflictDetails String?
+  errorMessage    String?
   syncedAt        DateTime     @default(now())
 }
